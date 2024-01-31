@@ -1,17 +1,40 @@
-with cte0 as  (
+with 
+cte0_0 as  (
   select * 
-  FROM `people-analytics-keeptruckin.hamza_test.Rating`
+  FROM `people-analytics-keeptruckin.0_2024_H1_360.ratings`
+),
+
+cte0 as (
+  SELECT d.email_address, DATE_DIFF(DATE '2024-02-20', hire_date, DAY) as diff,
+  ceo_3_email, ceo_4_email, ceo_5_email, ceo_6_email, ceo_7_email,
+  management_chain_level_03 as mg1, 
+  management_chain_level_04 as mg2, 
+  management_chain_level_05 as mg3,
+  management_chain_level_06 as mg4,
+  management_chain_level_07 as mg5,
+  case 
+  when DATE_DIFF(DATE '2024-02-20', hire_date, DAY) < 90 then 'Too new to tell'
+  when r.rating is null then "Not Rated"
+  else r.rating
+  end as rating,
+  FROM `people-analytics-keeptruckin.workday_raw.census_dni` d
+  left join cte0_0 r
+  on d.email_address = r.email_address
+  where 
+  d.active_status = 1
+  and _fivetran_deleted = false
+  and d.employee_type = 'Regular'
 ),
 
 cte2 as (
   SELECT ceo_5_email, mg3, count(rating) as total_count FROM cte0
-  where rating <> 'Too new to tell'
+  where rating <> 'Too new to tell' and rating <> 'Not Rated'
   group by ceo_5_email, mg3
 ),
 
 cte2_ as (
   SELECT ceo_5_email, mg4, count(rating) as total_count FROM cte0
-  where rating <> 'Too new to tell'
+  where rating <> 'Too new to tell' and rating <> 'Not Rated'
   group by ceo_5_email, mg4
 ),
 
@@ -20,13 +43,13 @@ cte2_ as (
 
 cte4 as (
   SELECT ceo_5_email, mg3, rating, count(rating) as total_count_2 FROM cte0
-  where rating <> 'Too new to tell'
+  where rating <> 'Too new to tell'  and rating <> 'Not Rated'
   group by ceo_5_email, mg3, rating
 ),
 
 cte4_ as (
   SELECT ceo_5_email, mg4, rating, count(rating) as total_count_2 FROM cte0
-  where rating <> 'Too new to tell'
+  where rating <> 'Too new to tell'  and rating <> 'Not Rated'
   group by ceo_5_email, mg4, rating
 ),
 
@@ -141,25 +164,25 @@ cte19 as (
 ),
 
 cteA as (
-  SELECT distinct(mg3) FROM `people-analytics-keeptruckin.hamza_test.Rating`
+  SELECT distinct(mg3) FROM cte0
   where mg3 is not null
   order by mg3
 ),
 
 cteB as (
-  SELECT distinct(mg3) FROM `people-analytics-keeptruckin.hamza_test.Rating`
+  SELECT distinct(mg3) FROM cte0
   where mg3 is not null and rating = 'Too new to tell'
   order by mg3
 ),
 
 cteC as (
-  SELECT distinct(mg4) FROM `people-analytics-keeptruckin.hamza_test.Rating`
+  SELECT distinct(mg4) FROM cte0
   where mg4 is not null
   order by mg4
 ),
 
 cteD as (
-  SELECT distinct(mg4) FROM `people-analytics-keeptruckin.hamza_test.Rating`
+  SELECT distinct(mg4) FROM cte0
   where mg4 is not null and rating = 'Too new to tell'
   order by mg4
 ),
@@ -232,9 +255,34 @@ cteI as (
 cteFinal as (
   select cte19.*, cteI.total_count as Not_Eligible_for_Rating from cte19 inner join cteI
   on cte19.mg1 = cteI.mg1
+),
+
+cteRem1 as (
+  SELECT ceo_5_email, mg3 as mg1, count(mg3) as total_count FROM cte0
+  where rating = 'Not Rated' and mg3 is not null
+  group by ceo_5_email, mg3
+),
+
+cteRem2 as (
+  SELECT ceo_5_email, mg4 as mg1, count(mg4) as total_count FROM cte0
+  where rating = 'Not Rated' and mg4 is not null
+  group by ceo_5_email, mg4
+),
+
+cteRemC as (
+  select * from cteRem2
+  union all
+  select * from cteRem1
+),
+
+cteCom as (
+  select cteFinal.*, cteRemC.total_count as Not_Rated from cteFinal inner join cteRemC
+  on cteFinal.mg1 = cteRemC.mg1
 )
 
 
+select * from cteCom 
 
-select * from cteFinal 
-order by mg_email
+
+
+
